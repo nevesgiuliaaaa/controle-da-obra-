@@ -252,6 +252,7 @@ function fmtData(iso){ if(!iso)return '—'; const p=iso.split('-'); return p[2]
 function fmtDataHora(iso,h){ return fmtData(iso)+' '+h; }
 function nomeMes(key){ const p=key.split('-'); const m=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']; return m[parseInt(p[1])-1]+' de '+p[0]; }
 function numeroDoc(v){ return (v||'').replace(/\D/g,''); }
+function normalizar(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
 
 /* ============ SEMEADOR ============ */
 function semear(){
@@ -389,7 +390,7 @@ function renderInicio(){
 }
 function card(ic,label,val){ return `<div class="card"><div class="card-icon">${ic}</div><div class="card-label">${label}</div><div class="card-value">${val}</div></div>`; }
 
-/* ============ VEÍCULOS ============ */
+/* ============ VEÍCULOS (mais recente primeiro) ============ */
 function renderVeiculos(){
   let lista=DB.veiculos.slice();
   const q=estado.buscaVeic||'';
@@ -398,7 +399,7 @@ function renderVeiculos(){
   if(estado.filtroVeic==='nolocal')lista=lista.filter(v=>estaDentro(v.id,'veiculo'));
   if(estado.filtroVeic==='entradas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='veiculo'&&m.data===hojeKey&&m.movimento==='entrada'));
   if(estado.filtroVeic==='saidas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='veiculo'&&m.data===hojeKey&&m.movimento==='saida'));
-  lista.sort((a,b)=>{ const ma=ultimaMov(a.id,'veiculo'); const mb=ultimaMov(b.id,'veiculo'); const ka=ma?(ma.data+ma.horario):''; const kb=mb?(mb.data+mb.horario):''; if(ka&&kb)return kb.localeCompare(ka); if(ka)return -1; if(kb)return 1; return 0; });
+  lista.sort((a,b)=>{ const ma=ultimaMov(a.id,'veiculo'), mb=ultimaMov(b.id,'veiculo'); const ka=ma?(ma.data+ma.horario):'', kb=mb?(mb.data+mb.horario):''; if(ka&&kb)return kb.localeCompare(ka); if(ka)return -1; if(kb)return 1; return 0; });
   const porPag=8, total=lista.length, paginasN=Math.max(1,Math.ceil(total/porPag)); if(estado.pagVeic>paginasN)estado.pagVeic=paginasN;
   const ini=(estado.pagVeic-1)*porPag, pagina=lista.slice(ini,ini+porPag);
   const c=document.getElementById('content');
@@ -435,7 +436,7 @@ function painelEncontrado(tipo,ref){
   </div>`;
 }
 
-/* ============ VISITANTES ============ */
+/* ============ VISITANTES (mais recente primeiro) ============ */
 function renderVisitantes(){
   let lista=DB.visitantes.slice();
   const q=estado.buscaVisit||'';
@@ -444,7 +445,7 @@ function renderVisitantes(){
   if(estado.filtroVisit==='dentro')lista=lista.filter(v=>estaDentro(v.id,'visitante'));
   if(estado.filtroVisit==='entradas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='visitante'&&m.data===hojeKey&&m.movimento==='entrada'));
   if(estado.filtroVisit==='saidas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='visitante'&&m.data===hojeKey&&m.movimento==='saida'));
-  lista.sort((a,b)=>{ const ma=ultimaMov(a.id,'visitante'); const mb=ultimaMov(b.id,'visitante'); const ka=ma?(ma.data+ma.horario):''; const kb=mb?(mb.data+mb.horario):''; if(ka&&kb)return kb.localeCompare(ka); if(ka)return -1; if(kb)return 1; return 0; });
+  lista.sort((a,b)=>{ const ma=ultimaMov(a.id,'visitante'), mb=ultimaMov(b.id,'visitante'); const ka=ma?(ma.data+ma.horario):'', kb=mb?(mb.data+mb.horario):''; if(ka&&kb)return kb.localeCompare(ka); if(ka)return -1; if(kb)return 1; return 0; });
   const porPag=8, total=lista.length, paginasN=Math.max(1,Math.ceil(total/porPag)); if(estado.pagVisit>paginasN)estado.pagVisit=paginasN;
   const ini=(estado.pagVisit-1)*porPag, pagina=lista.slice(ini,ini+porPag);
   const c=document.getElementById('content');
@@ -716,11 +717,19 @@ function salvarEdicaoToalha(id){ const t=DB.toalhas.find(t=>t.id===id); t.nome=d
 /* ============ MÁSCARAS E AUTOCOMPLETE ============ */
 function mascaraCPF(v){ v=v.replace(/\D/g,'').slice(0,11); let r=v; if(v.length>9)r=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9); else if(v.length>6)r=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6); else if(v.length>3)r=v.slice(0,3)+'.'+v.slice(3); return r; }
 function mascaraRG(v){ v=v.replace(/\D/g,'').slice(0,10); let r=v; if(v.length>8)r=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5,8)+'-'+v.slice(8); else if(v.length>5)r=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5); else if(v.length>2)r=v.slice(0,2)+'.'+v.slice(2); return r; }
-function aplicarMascaraDoc(input){ const tipo=document.getElementById('visTipoDoc'); const t=(window._tipoDoc)||(tipo?tipo.value:'CPF'); input.value=t==='CPF'?mascaraCPF(input.value):mascaraRG(input.value); }
+function aplicarMascaraDoc(input){ const t=(window._tipoDoc)||'CPF'; input.value=t==='CPF'?mascaraCPF(input.value):mascaraRG(input.value); }
 function montarAutocomplete(inputId,listId,itens,onSelect){
   const input=document.getElementById(inputId), list=document.getElementById(listId);
   if(!input||!list)return;
-  input.addEventListener('input',function(){ const q=this.value.trim().toLowerCase(); if(q.length<1){ list.classList.remove('open'); list.innerHTML=''; return; } const f=itens.filter(i=>i.busca.includes(q)).slice(0,6); if(!f.length){ list.classList.remove('open'); list.innerHTML=''; return; } window._autoItens=f; window._autoOnSelect=onSelect; list.innerHTML=f.map((i,idx)=>`<div class="autocomplete-item" onmousedown="event.preventDefault();selecionarAuto(${idx})"><span class="ac-icon">${i.icon}</span><div><div class="ac-title">${esc(i.titulo)}</div><div class="ac-sub">${i.sub}</div></div></div>`).join(''); list.classList.add('open'); });
+  input.addEventListener('input',function(){
+    const q=normalizar(this.value);
+    if(q.length<1){ list.classList.remove('open'); list.innerHTML=''; return; }
+    const f=itens.filter(i=>normalizar(i.busca).includes(q)).slice(0,6);
+    if(!f.length){ list.classList.remove('open'); list.innerHTML=''; return; }
+    window._autoItens=f; window._autoOnSelect=onSelect;
+    list.innerHTML=f.map((i,idx)=>`<div class="autocomplete-item" onmousedown="event.preventDefault();selecionarAuto(${idx})"><span class="ac-icon">${i.icon}</span><div><div class="ac-title">${esc(i.titulo)}</div><div class="ac-sub">${i.sub}</div></div></div>`).join('');
+    list.classList.add('open');
+  });
   input.addEventListener('blur',function(){ setTimeout(()=>list.classList.remove('open'),180); });
 }
 function selecionarAuto(idx){ const itens=window._autoItens||[], on=window._autoOnSelect; if(itens[idx]&&on)on(itens[idx]); document.querySelectorAll('.autocomplete-list.open').forEach(x=>x.classList.remove('open')); }
@@ -729,6 +738,16 @@ function setTipoDoc(t){
   ['tipoCPF','tipoRG','tipoOutro'].forEach(id=>{ const el=document.getElementById(id); if(el)el.classList.toggle('active',id==='tipoCPF'&&t==='CPF'||id==='tipoRG'&&t==='RG'||id==='tipoOutro'&&t==='Outro'); });
   const input=document.getElementById('visDoc');
   if(input){ input.placeholder=t==='CPF'?'000.000.000-00':(t==='RG'?'12.345.678-9':'Nº do documento'); aplicarMascaraDoc(input); }
+}
+function carregarFotoVisitante(vis){
+  const prev=document.getElementById('visFotoPrev'), input=document.getElementById('visFoto');
+  if(vis.foto){ prev.innerHTML=`<img src="${vis.foto}" alt="foto">`; input.value=vis.foto; }
+  else { prev.innerHTML='Sem foto'; input.value=''; }
+}
+function carregarFotoPlaca(veic){
+  const prev=document.getElementById('veicFotoPrev'), input=document.getElementById('veicFoto');
+  if(veic.foto){ prev.innerHTML=`<img src="${veic.foto}" alt="foto">`; input.value=veic.foto; }
+  else { prev.innerHTML='Sem foto'; input.value=''; }
 }
 
 /* ============ NOVO REGISTRO ============ */
@@ -750,15 +769,16 @@ function abrirRegistroEntrada(tipo,id){
       <div class="field"><label>Nome do motorista *</label><input id="veicMotorista" value="${ref?esc(ref.motorista):''}"></div>
       <div class="field"><label>Empresa</label><input id="veicEmpresa" value="${ref?esc(ref.empresa):''}"></div>
       <div class="field"><label>Observação / Motivo da visita *</label><select id="veicObs"><option>Entrega de materiais</option><option>Visita técnica</option><option>Reunião</option><option>Manutenção</option><option>Prestação de serviço</option><option>Entrega de documentos</option></select></div>
-      <div class="field"><label>Foto da placa</label><div class="photo-preview" id="veicFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('veicFotoPrev','veicFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('veicFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="veicFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'veicFotoPrev','veicFoto')"></div><input type="hidden" id="veicFoto"></div>
+      <div class="field"><label>Foto da placa *</label><div class="photo-preview" id="veicFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('veicFotoPrev','veicFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('veicFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="veicFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'veicFotoPrev','veicFoto')"></div><input type="hidden" id="veicFoto"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEntradaVeiculo()">Registrar Entrada</button></div>`);
-    const veicItens=DB.veiculos.map(v=>{ const um=ultimaMov(v.id,'veiculo'), ms=movsDe(v.id,'veiculo'); return {busca:(v.placa+' '+v.motorista+' '+v.empresa).toLowerCase(),icon:'🚗',titulo:v.placa,sub:'Motorista: '+v.motorista+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s) • Última: '+(um?fmtDataHora(um.data,um.horario):'—'),dados:v}; });
+    const veicItens=DB.veiculos.map(v=>{ const um=ultimaMov(v.id,'veiculo'), ms=movsDe(v.id,'veiculo'); return {busca:v.placa+' '+v.motorista+' '+v.empresa,icon:'🚗',titulo:v.placa,sub:'Motorista: '+v.motorista+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s) • Última: '+(um?fmtDataHora(um.data,um.horario):'—'),dados:v}; });
     montarAutocomplete('veicPlaca','veicAutoList',veicItens,function(item){
       document.getElementById('veicPlaca').value=item.dados.placa;
       document.getElementById('veicMotorista').value=item.dados.motorista;
       document.getElementById('veicEmpresa').value=item.dados.empresa;
+      carregarFotoPlaca(item.dados);
       const ms=movsDe(item.dados.id,'veiculo'), dentro=estaDentro(item.dados.id,'veiculo');
-      document.getElementById('veicAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.placa)} — ${esc(item.dados.motorista)} • ${ms.length} visita(s) • ${dentro?'🟢 Dentro do local':'Fora'}</div>`;
+      document.getElementById('veicAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.placa)} — ${esc(item.dados.motorista)} • ${ms.length} visita(s) • Foto da placa carregada • ${dentro?'🟢 Dentro do local':'Fora'}</div>`;
     });
   }else{
     abrirModal(`<h3>${ref?'Registrar Entrada — '+esc(ref.nome):'Cadastrar Visitante'}</h3>
@@ -768,24 +788,26 @@ function abrirRegistroEntrada(tipo,id){
       <div id="visAuto"></div>
       <div class="field"><label>Empresa</label><input id="visEmpresa" value="${ref?esc(ref.empresa):''}"></div>
       <div class="field"><label>Observação / Motivo da visita</label><select id="visObs"><option>Reunião</option><option>Entrega de materiais</option><option>Visita técnica</option><option>Manutenção</option><option>Prestação de serviço</option><option>Entrega de documentos</option></select></div>
-      <div class="field"><label>Foto do visitante</label><div class="photo-preview" id="visFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('visFotoPrev','visFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('visFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="visFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'visFotoPrev','visFoto')"></div><input type="hidden" id="visFoto"></div>
+      <div class="field"><label>Foto do visitante *</label><div class="photo-preview" id="visFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('visFotoPrev','visFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('visFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="visFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'visFotoPrev','visFoto')"></div><input type="hidden" id="visFoto"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEntradaVisitante()">Registrar Entrada</button></div>`);
     window._tipoDoc='CPF';
-    const nomeItens=DB.visitantes.map(v=>{ const ms=movsDe(v.id,'visitante'); return {busca:v.nome.toLowerCase(),icon:'👤',titulo:v.nome,sub:'Doc: '+v.documento+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
+    const nomeItens=DB.visitantes.map(v=>{ const ms=movsDe(v.id,'visitante'); return {busca:v.nome+' '+v.empresa,icon:'👤',titulo:v.nome,sub:'Doc: '+v.documento+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
     montarAutocomplete('visNome','visNomeList',nomeItens,function(item){
       document.getElementById('visNome').value=item.dados.nome;
       document.getElementById('visDoc').value=item.dados.documento;
       document.getElementById('visEmpresa').value=item.dados.empresa;
+      carregarFotoVisitante(item.dados);
       const ms=movsDe(item.dados.id,'visitante');
-      document.getElementById('visAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.nome)} • ${ms.length} visita(s) • Cadastro existente</div>`;
+      document.getElementById('visAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.nome)} • ${ms.length} visita(s) • Foto carregada do cadastro</div>`;
     });
-    const docItens=DB.visitantes.map(v=>{ const ms=movsDe(v.id,'visitante'); return {busca:numeroDoc(v.documento),icon:'🪪',titulo:v.documento,sub:v.nome+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
+    const docItens=DB.visitantes.map(v=>{ const ms=movsDe(v.id,'visitante'); return {busca:numeroDoc(v.documento)+' '+v.nome,icon:'🪪',titulo:v.documento,sub:v.nome+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
     montarAutocomplete('visDoc','visDocList',docItens,function(item){
       document.getElementById('visNome').value=item.dados.nome;
       document.getElementById('visDoc').value=item.dados.documento;
       document.getElementById('visEmpresa').value=item.dados.empresa;
+      carregarFotoVisitante(item.dados);
       const ms=movsDe(item.dados.id,'visitante');
-      document.getElementById('visAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.nome)} • ${ms.length} visita(s) • Cadastro existente</div>`;
+      document.getElementById('visAuto').innerHTML=`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ ${esc(item.dados.nome)} • ${ms.length} visita(s) • Foto carregada do cadastro</div>`;
     });
   }
 }
@@ -803,9 +825,10 @@ function salvarEntradaVeiculo(){
   const motorista=document.getElementById('veicMotorista').value.trim(), empresa=document.getElementById('veicEmpresa').value.trim();
   const obs=document.getElementById('veicObs').value, foto=document.getElementById('veicFoto').value;
   if(!placa||!motorista){ toast('Preencha placa e motorista','error'); return; }
+  if(!foto){ toast('A foto da placa é obrigatória. Tire ou selecione uma foto.','error'); return; }
   let veic=DB.veiculos.find(v=>v.placa===placa);
   if(!veic){ veic={id:uid(),placa,motorista,empresa,foto,observacao:obs,dataCadastro:hoje(),usuario:u.nome}; DB.veiculos.push(veic); }
-  else { veic.motorista=motorista; veic.empresa=empresa; if(foto)veic.foto=foto; }
+  else { veic.motorista=motorista; veic.empresa=empresa; veic.foto=foto; }
   if(estaDentro(veic.id,'veiculo')){ toast('Este veículo já está dentro do local','error'); return; }
   DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:veic.id,data:hoje(),horario:agora(),movimento:'entrada',observacao:obs,usuario:u.nome,dataSaida:null,horarioSaida:null,usuarioSaida:null});
   salvarDB(); fecharModal(); renderPagina(); toast('Entrada registrada às '+agora(),'success');
@@ -815,9 +838,10 @@ function salvarEntradaVisitante(){
   const nome=document.getElementById('visNome').value.trim(), doc=document.getElementById('visDoc').value.trim();
   const empresa=document.getElementById('visEmpresa').value.trim(), obs=document.getElementById('visObs').value, foto=document.getElementById('visFoto').value;
   if(!nome||!doc){ toast('Preencha nome e documento','error'); return; }
-  let vis=DB.visitantes.find(v=>numeroDoc(v.documento)===numeroDoc(doc));
+  if(!foto){ toast('A foto do visitante é obrigatória. Tire ou selecione uma foto.','error'); return; }
+  let vis=DB.visitantes.find(v=>numeroDoc(v.documento)===numeroDoc(doc)||normalizar(v.nome)===normalizar(nome));
   if(!vis){ vis={id:uid(),nome,documento:doc,empresa,foto,observacao:obs,dataCadastro:hoje(),usuario:u.nome}; DB.visitantes.push(vis); }
-  else { vis.nome=nome; vis.empresa=empresa; if(foto)vis.foto=foto; }
+  else { vis.nome=nome; vis.documento=doc; vis.empresa=empresa; vis.foto=foto; }
   if(estaDentro(vis.id,'visitante')){ toast('Este visitante já está dentro','error'); return; }
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vis.id,data:hoje(),horario:agora(),movimento:'entrada',observacao:obs,usuario:u.nome,dataSaida:null,horarioSaida:null,usuarioSaida:null});
   salvarDB(); fecharModal(); renderPagina(); toast('Entrada registrada às '+agora(),'success');
@@ -842,7 +866,7 @@ function abrirNovaToalha(){
   const nomesSet={};
   DB.toalhas.forEach(t=>{ nomesSet[t.nome+'|'+t.empresa]={nome:t.nome,empresa:t.empresa}; });
   DB.visitantes.forEach(v=>{ nomesSet[v.nome+'|'+v.empresa]={nome:v.nome,empresa:v.empresa}; });
-  const itens=Object.values(nomesSet).map(p=>({busca:(p.nome+' '+p.empresa).toLowerCase(),icon:'👤',titulo:p.nome,sub:'Empresa: '+p.empresa,dados:p}));
+  const itens=Object.values(nomesSet).map(p=>({busca:p.nome+' '+p.empresa,icon:'👤',titulo:p.nome,sub:'Empresa: '+p.empresa,dados:p}));
   montarAutocomplete('tNome','tNomeList',itens,function(item){ document.getElementById('tNome').value=item.dados.nome; document.getElementById('tEmpresa').value=item.dados.empresa; });
 }
 function salvarToalha(entregue){
