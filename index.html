@@ -370,6 +370,37 @@ function estaDentro(refId,tipo){const ms=movsDe(refId,tipo);return ms.length>0&&
 function ultimaMov(refId,tipo){return movsDe(refId,tipo)[0]||null}
 function tempoDecorrido(data,horario){const d=new Date(data+'T'+horario+':00');const diff=Date.now()-d.getTime();if(diff<0)return 'agora';const min=Math.floor(diff/60000);if(min<60)return min+'min';const h=Math.floor(min/60);const r=min%60;return h+'h'+String(r).padStart(2,'0')}
 
+/* ============ MÁSCARAS ============ */
+function mascaraCPF(v){ v=v.replace(/\D/g,'').slice(0,11); let r=v; if(v.length>9)r=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9); else if(v.length>6)r=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6); else if(v.length>3)r=v.slice(0,3)+'.'+v.slice(3); return r; }
+function mascaraRG(v){ v=v.replace(/\D/g,'').slice(0,10); let r=v; if(v.length>8)r=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5,8)+'-'+v.slice(8); else if(v.length>5)r=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5); else if(v.length>2)r=v.slice(0,2)+'.'+v.slice(2); return r; }
+function aplicarMascaraDoc(input){ const t=(window._tipoDoc)||'CPF'; input.value=(t==='CPF')?mascaraCPF(input.value):mascaraRG(input.value); }
+function setTipoDoc(t){
+  window._tipoDoc=t;
+  ['tipoCPF','tipoRG','tipoOutro'].forEach(function(id){ var el=document.getElementById(id); if(el)el.classList.toggle('active',(id==='tipoCPF'&&t==='CPF')||(id==='tipoRG'&&t==='RG')||(id==='tipoOutro'&&t==='Outro')); });
+  var input=document.getElementById('visDoc');
+  if(input){ input.placeholder=(t==='CPF')?'000.000.000-00':((t==='RG')?'12.345.678-9':'Nº do documento'); aplicarMascaraDoc(input); }
+}
+
+/* ============ AUTOCOMPLETE (digitar -> puxar cadastro e substituir) ============ */
+function montarAutocomplete(inputId,listId,itens,onSelect){
+  var input=document.getElementById(inputId), list=document.getElementById(listId);
+  if(!input||!list)return;
+  input.addEventListener('input',function(){
+    var q=normalizar(this.value);
+    if(q.length<1){ list.classList.remove('open'); list.innerHTML=''; return; }
+    var f=itens.filter(function(i){ return normalizar(i.busca).indexOf(q)!==-1; }).slice(0,6);
+    if(!f.length){ list.classList.remove('open'); list.innerHTML=''; return; }
+    window._autoItens=f; window._autoOnSelect=onSelect;
+    list.innerHTML=f.map(function(i,idx){ return '<div class="autocomplete-item" onmousedown="event.preventDefault();selecionarAuto('+idx+')"><span class="ac-icon">'+i.icon+'</span><div><div class="ac-title">'+esc(i.titulo)+'</div><div class="ac-sub">'+i.sub+'</div></div></div>'; }).join('');
+    list.classList.add('open');
+  });
+  input.addEventListener('blur',function(){ setTimeout(function(){ list.classList.remove('open'); },180); });
+}
+function selecionarAuto(idx){
+  var itens=window._autoItens||[], on=window._autoOnSelect;
+  if(itens[idx]&&on)on(itens[idx]);
+  document.querySelectorAll('.autocomplete-list.open').forEach(function(x){ x.classList.remove('open'); });
+}
 /* ============ NAVEGAÇÃO ============ */
 const paginas={
   inicio:{titulo:'Início',sub:'Bem-vinda ao sistema de controle de acesso.',render:renderInicio,novo:true},
@@ -995,36 +1026,50 @@ function abrirRegistroSaida(){
 function confirmarSaidaSelecionada(){const v=document.getElementById('saidaRef').value;if(!v){toast('Ninguém no local','error');return;}const[tipo,id]=v.split('|');fecharModal();registrarSaida(tipo,id)}
 
 function abrirRegistroEntrada(tipo,id){
-  const ref=tipo==='veiculo'?(id?DB.veiculos.find(v=>v.id===id):null):(id?DB.visitantes.find(v=>v.id===id):null);
+  var ref=(tipo==='veiculo')?(id?DB.veiculos.find(function(v){return v.id===id;}):null):(id?DB.visitantes.find(function(v){return v.id===id;}):null);
   if(tipo==='veiculo'){
     abrirModal(`<h3>${ref?'Registrar Entrada — '+esc(ref.placa):'Cadastrar Veículo'}</h3>
-      <div class="field"><label>Placa *</label><input id="veicPlaca" value="${ref?esc(ref.placa):''}" placeholder="ABC1D23" style="text-transform:uppercase" oninput="buscarPlacaAuto(this.value)"></div>
+      <div class="field autocomplete"><label>Placa *</label><input id="veicPlaca" value="${ref?esc(ref.placa):''}" placeholder="ABC1D23" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase();buscarPlacaAuto(this.value)"><div class="autocomplete-list" id="veicAutoList"></div></div>
       <div id="veicAuto"></div>
       <div class="field"><label>Nome do motorista *</label><input id="veicMotorista" value="${ref?esc(ref.motorista):''}"></div>
       <div class="field"><label>Empresa</label><input id="veicEmpresa" value="${ref?esc(ref.empresa):''}"></div>
       <div class="field"><label>Observação / Motivo da visita *</label><select id="veicObs"><option>Entrega de materiais</option><option>Visita técnica</option><option>Reunião</option><option>Manutenção</option><option>Prestação de serviço</option><option>Entrega de documentos</option></select></div>
-      <div class="field"><label>Foto da placa</label>
-        <div class="photo-preview" id="veicFotoPrev">Sem foto</div>
-        <div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('veicFotoPrev','veicFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('veicFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="veicFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'veicFotoPrev','veicFoto')"></div>
-        <input type="hidden" id="veicFoto">
-      </div>
+      <div class="field"><label>Foto da placa</label><div class="photo-preview" id="veicFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('veicFotoPrev','veicFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('veicFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="veicFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'veicFotoPrev','veicFoto')"></div><input type="hidden" id="veicFoto"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEntradaVeiculo()">Registrar Entrada</button></div>`);
+    var veicItens=DB.veiculos.map(function(v){ var um=ultimaMov(v.id,'veiculo'), ms=movsDe(v.id,'veiculo'); return {busca:v.placa+' '+v.motorista+' '+v.empresa,icon:'🚗',titulo:v.placa,sub:'Motorista: '+v.motorista+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
+    montarAutocomplete('veicPlaca','veicAutoList',veicItens,function(item){
+      document.getElementById('veicPlaca').value=item.dados.placa;
+      document.getElementById('veicMotorista').value=item.dados.motorista;
+      document.getElementById('veicEmpresa').value=item.dados.empresa;
+      carregarFotoPlaca(item.dados);
+      document.getElementById('veicAuto').innerHTML='<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ Cadastro existente carregado: '+esc(item.dados.placa)+' — '+esc(item.dados.motorista)+'</div>';
+    });
   }else{
     abrirModal(`<h3>${ref?'Registrar Entrada — '+esc(ref.nome):'Cadastrar Visitante'}</h3>
-      <div class="field"><label>Nome completo *</label><input id="visNome" value="${ref?esc(ref.nome):''}"></div>
-      <div class="field"><label>Nº do documento *</label><input id="visDoc" value="${ref?esc(ref.documento):''}" placeholder="000.000.000-00" oninput="buscarDocAuto(this.value)"></div>
+      <div class="field autocomplete"><label>Nome completo *</label><input id="visNome" value="${ref?esc(ref.nome):''}" placeholder="Nome completo"><div class="autocomplete-list" id="visNomeList"></div></div>
+      <div class="field"><label>Tipo de documento</label><div class="tipo-doc"><button type="button" class="chip active" id="tipoCPF" onclick="setTipoDoc('CPF')">CPF</button><button type="button" class="chip" id="tipoRG" onclick="setTipoDoc('RG')">RG</button><button type="button" class="chip" id="tipoOutro" onclick="setTipoDoc('Outro')">Outro</button></div></div>
+      <div class="field autocomplete"><label>Nº do documento *</label><input id="visDoc" value="${ref?esc(ref.documento):''}" placeholder="000.000.000-00" oninput="aplicarMascaraDoc(this);buscarDocAuto(this.value)"><div class="autocomplete-list" id="visDocList"></div></div>
       <div id="visAuto"></div>
       <div class="field"><label>Empresa</label><input id="visEmpresa" value="${ref?esc(ref.empresa):''}"></div>
       <div class="field"><label>Observação / Motivo da visita</label><select id="visObs"><option>Reunião</option><option>Entrega de materiais</option><option>Visita técnica</option><option>Manutenção</option><option>Prestação de serviço</option><option>Entrega de documentos</option></select></div>
-      <div class="field"><label>Foto do visitante</label>
-        <div class="photo-preview" id="visFotoPrev">Sem foto</div>
-        <div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('visFotoPrev','visFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('visFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="visFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'visFotoPrev','visFoto')"></div>
-        <input type="hidden" id="visFoto">
-      </div>
+      <div class="field"><label>Foto do visitante</label><div class="photo-preview" id="visFotoPrev">Sem foto</div><div class="photo-btns"><button class="btn btn-outline btn-sm" onclick="tirarFoto('visFotoPrev','visFoto')">📷 Tirar foto</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('visFotoFile').click()">📁 Selecionar arquivo</button><input type="file" id="visFotoFile" accept="image/*" style="display:none" onchange="lerArquivoFoto(this,'visFotoPrev','visFoto')"></div><input type="hidden" id="visFoto"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEntradaVisitante()">Registrar Entrada</button></div>`);
-  }
+    window._tipoDoc='CPF';
+    var nomeItens=DB.visitantes.map(function(v){ var ms=movsDe(v.id,'visitante'); return {busca:v.nome+' '+v.empresa,icon:'👤',titulo:v.nome,sub:'Doc: '+v.documento+' • Empresa: '+v.empresa+' • '+ms.length+' visita(s)',dados:v}; });
+    montarAutocomplete('visNome','visNomeList',nomeItens,function(item){
+      document.getElementById('visNome').value=item.dados.nome;
+      document.getElementById('visDoc').value=item.dados.documento;
+      document.getElementById('visEmpresa').value=item.dados.empresa;
+    function carregarFotoVisitante(vis){
+  var prev=document.getElementById('visFotoPrev'), input=document.getElementById('visFoto');
+  if(vis&&vis.foto){ prev.innerHTML='<img src="'+vis.foto+'" alt="foto">'; input.value=vis.foto; }
+  else { prev.innerHTML='Sem foto'; input.value=''; }
 }
-function buscarPlacaAuto(val){
+      function carregarFotoPlaca(veic){
+  var prev=document.getElementById('veicFotoPrev'), input=document.getElementById('veicFoto');
+  if(veic&&veic.foto){ prev.innerHTML='<img src="'+veic.foto+'" alt="foto">'; input.value=veic.foto; }
+  else { prev.innerHTML='Sem foto'; input.value=''; }
+}function buscarPlacaAuto(val){
   const v=DB.veiculos.find(x=>x.placa===val.toUpperCase());
   document.getElementById('veicAuto').innerHTML=v?`<div style="background:var(--verde-bg);padding:10px;border-radius:6px;font-size:13px;color:var(--verde-tx);margin-bottom:10px">✅ Placa encontrada: ${esc(v.motorista)} — ${esc(v.empresa)}. Usando cadastro existente.</div>`:'';
 }
@@ -1048,19 +1093,29 @@ function salvarEntradaVeiculo(){
   salvarDB();fecharModal();renderPagina();toast('Entrada registrada às '+agora(),'success');
 }
 function salvarEntradaVisitante(){
-  const u=getUsuario();
-  const nome=document.getElementById('visNome').value.trim();
-  const doc=document.getElementById('visDoc').value.trim();
-  const empresa=document.getElementById('visEmpresa').value.trim();
-  const obs=document.getElementById('visObs').value;
-  const foto=document.getElementById('visFoto').value;
-  if(!nome||!doc){toast('Preencha nome e documento','error');return;}
-  let vis=DB.visitantes.find(v=>v.documento.replace(/\D/g,'')===doc.replace(/\D/g,''));
-  if(!vis){vis={id:uid(),nome,documento:doc,empresa,foto,observacao:obs,dataCadastro:hoje(),usuario:u.nome};DB.visitantes.push(vis);}
-  else{vis.nome=nome;vis.empresa=empresa;if(foto)vis.foto=foto;}
-  if(estaDentro(vis.id,'visitante')){toast('Este visitante já está dentro','error');return;}
+  var u=getUsuario();
+  var nome=document.getElementById('visNome').value.trim(), doc=document.getElementById('visDoc').value.trim();
+  var empresa=document.getElementById('visEmpresa').value.trim(), obs=document.getElementById('visObs').value, foto=document.getElementById('visFoto').value;
+  if(!nome||!doc){ toast('Preencha nome e documento','error'); return; }
+  var vis=DB.visitantes.find(function(v){ return numeroDoc(v.documento)===numeroDoc(doc)||normalizar(v.nome)===normalizar(nome); });
+  if(!vis){ vis={id:uid(),nome,documento:doc,empresa,foto,observacao:obs,dataCadastro:hoje(),usuario:u.nome}; DB.visitantes.push(vis); }
+  else { vis.nome=nome; vis.documento=doc; vis.empresa=empresa; if(foto)vis.foto=foto; }
+  if(estaDentro(vis.id,'visitante')){ toast('Este visitante já está dentro','error'); return; }
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vis.id,data:hoje(),horario:agora(),movimento:'entrada',observacao:obs,usuario:u.nome,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  salvarDB();fecharModal();renderPagina();toast('Entrada registrada às '+agora(),'success');
+  salvarDB(); fecharModal(); renderPagina(); toast('Entrada registrada às '+agora(),'success');
+}
+function salvarEntradaVeiculo(){
+  var u=getUsuario();
+  var placa=document.getElementById('veicPlaca').value.trim().toUpperCase();
+  var motorista=document.getElementById('veicMotorista').value.trim(), empresa=document.getElementById('veicEmpresa').value.trim();
+  var obs=document.getElementById('veicObs').value, foto=document.getElementById('veicFoto').value;
+  if(!placa||!motorista){ toast('Preencha placa e motorista','error'); return; }
+  var veic=DB.veiculos.find(function(v){ return v.placa===placa; });
+  if(!veic){ veic={id:uid(),placa,motorista,empresa,foto,observacao:obs,dataCadastro:hoje(),usuario:u.nome}; DB.veiculos.push(veic); }
+  else { veic.motorista=motorista; veic.empresa=empresa; if(foto)veic.foto=foto; }
+  if(estaDentro(veic.id,'veiculo')){ toast('Este veículo já está dentro do local','error'); return; }
+  DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:veic.id,data:hoje(),horario:agora(),movimento:'entrada',observacao:obs,usuario:u.nome,dataSaida:null,horarioSaida:null,usuarioSaida:null});
+  salvarDB(); fecharModal(); renderPagina(); toast('Entrada registrada às '+agora(),'success');
 }
 function registrarSaida(tipo,id){
   const u=getUsuario();
