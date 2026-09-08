@@ -117,7 +117,7 @@ tr.totais-row td{font-weight:700;background:#FAFAFA;border-top:2px solid var(--b
 .photo-preview{width:80px;height:80px;border-radius:8px;background:var(--fundo);border:1px dashed var(--borda);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:10px;color:var(--texto2);font-size:12px}
 .photo-preview img{width:100%;height:100%;object-fit:cover}
 .photo-btns{display:flex;gap:8px;flex-wrap:wrap}
-video{width:100%;border-radius:8px;margin-bottom:10px}
+video{width:100%;border-radius:8px;margin-bottom:10px;background:#000;min-height:200px}
 /* TOAST */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--grafite);color:#fff;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:300;opacity:0;transform:translateY(20px);transition:.3s;font-size:14px}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -441,6 +441,17 @@ function renderVeiculos(){
   if(estado.filtroVeic==='nolocal')lista=lista.filter(v=>estaDentro(v.id,'veiculo'));
   if(estado.filtroVeic==='entradas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='veiculo'&&m.data===hojeKey&&m.movimento==='entrada'));
   if(estado.filtroVeic==='saidas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='veiculo'&&m.data===hojeKey&&m.movimento==='saida'));
+    // Ordenar do mais recente para o mais antigo (pela última movimentação)
+  lista.sort((a,b)=>{
+    const ma=ultimaMov(a.id,'veiculo');
+    const mb=ultimaMov(b.id,'veiculo');
+    const ka=ma?(ma.data+ma.horario):'';
+    const kb=mb?(mb.data+mb.horario):'';
+    if(ka&&kb)return kb.localeCompare(ka);
+    if(ka)return -1;
+    if(kb)return 1;
+    return 0;
+  });
   const porPag=8;const total=lista.length;const paginasN=Math.max(1,Math.ceil(total/porPag));if(estado.pagVeic>paginasN)estado.pagVeic=paginasN;
   const ini=(estado.pagVeic-1)*porPag;const pagina=lista.slice(ini,ini+porPag);
   const c=document.getElementById('content');
@@ -505,6 +516,17 @@ function renderVisitantes(){
   if(estado.filtroVisit==='dentro')lista=lista.filter(v=>estaDentro(v.id,'visitante'));
   if(estado.filtroVisit==='entradas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='visitante'&&m.data===hojeKey&&m.movimento==='entrada'));
   if(estado.filtroVisit==='saidas')lista=lista.filter(v=>DB.movimentacoes.some(m=>m.refId===v.id&&m.tipo==='visitante'&&m.data===hojeKey&&m.movimento==='saida'));
+    // Ordenar do mais recente para o mais antigo (pela última movimentação)
+  lista.sort((a,b)=>{
+    const ma=ultimaMov(a.id,'visitante');
+    const mb=ultimaMov(b.id,'visitante');
+    const ka=ma?(ma.data+ma.horario):'';
+    const kb=mb?(mb.data+mb.horario):'';
+    if(ka&&kb)return kb.localeCompare(ka);
+    if(ka)return -1;
+    if(kb)return 1;
+    return 0;
+  });
   const porPag=8;const total=lista.length;const paginasN=Math.max(1,Math.ceil(total/porPag));if(estado.pagVisit>paginasN)estado.pagVisit=paginasN;
   const ini=(estado.pagVisit-1)*porPag;const pagina=lista.slice(ini,ini+porPag);
   const c=document.getElementById('content');
@@ -622,7 +644,6 @@ function renderPerfil(){
     </div>`}
   </div>`;
 }
-
 /* ============ CONTROLE DE TOALHAS ============ */
 function renderToalhas(){
   const u=getUsuario();
@@ -741,13 +762,11 @@ function renderToalhaConsolidado(){
   let regs=DB.toalhas.filter(t=>t.mes===mes);
   const q=(estado.buscaToalha||'').toLowerCase();
   if(q)regs=regs.filter(r=>r.nome.toLowerCase().includes(q)||r.empresa.toLowerCase().includes(q)||r.responsavel.toLowerCase().includes(q));
-  // Acumulado por dia
   const porDia={};
   regs.forEach(r=>{ if(!porDia[r.data])porDia[r.data]={ent:0,dev:0}; if(r.entregue)porDia[r.data].ent+=r.quantidade; if(r.devolvido)porDia[r.data].dev+=r.quantidade; });
   const dias=Object.keys(porDia).sort();
   let accE=0,accD=0;
   const linhasDia=dias.map(d=>{accE+=porDia[d].ent;accD+=porDia[d].dev;return {data:d,ent:porDia[d].ent,dev:porDia[d].dev,accE,accD,saldo:accE-accD};});
-  // Consolidado por pessoa
   const porPessoa={};
   regs.forEach(r=>{ const k=r.nome+'|'+r.empresa; if(!porPessoa[k])porPessoa[k]={nome:r.nome,empresa:r.empresa,reg:0,ent:0,dev:0}; porPessoa[k].reg++; if(r.entregue)porPessoa[k].ent+=r.quantidade; if(r.devolvido)porPessoa[k].dev+=r.quantidade; });
   const pessoas=Object.values(porPessoa).sort((a,b)=>(b.ent+b.dev)-(a.ent+a.dev)||a.nome.localeCompare(b.nome));
@@ -1074,18 +1093,63 @@ function salvarToalha(entregue){
   toast((entregue?'✓ Entregue':'✕ Devolvido')+' registrado às '+agoraS,'success');
 }
 
-/* ============ FOTO (câmera / arquivo) ============ */
+/* ============ FOTO (câmera traseira / arquivo) ============ */
 function tirarFoto(prevId,inputId){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Câmera não suportada neste dispositivo','error');return;}
-  abrirModal(`<h3>Tirar foto</h3><video id="camVideo" autoplay playsinline></video>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="pararCam()">Cancelar</button><button class="btn btn-primary" onclick="capturarFoto('${prevId}','${inputId}')">📸 Capturar</button></div>`);
-  navigator.mediaDevices.getUserMedia({video:true}).then(s=>{window._camStream=s;document.getElementById('camVideo').srcObject=s;}).catch(()=>toast('Não foi possível acessar a câmera','error'));
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    toast('Câmera não suportada neste dispositivo','error');return;
+  }
+  abrirModal(`<h3>Tirar foto</h3>
+    <video id="camVideo" autoplay muted playsinline></video>
+    <p id="camStatus" style="color:var(--texto2);font-size:12px;margin-bottom:10px">Abrindo câmera traseira...</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="pararCam()">Cancelar</button>
+      <button class="btn btn-primary" id="btnCapturar" onclick="capturarFoto('${prevId}','${inputId}')" disabled>📸 Capturar</button>
+    </div>`);
+  const video=document.getElementById('camVideo');
+  const btn=document.getElementById('btnCapturar');
+  const status=document.getElementById('camStatus');
+  const preferencias=[{video:{facingMode:{ideal:'environment'}}},{video:true}];
+  let tentativa=0;
+  function iniciar(){
+    navigator.mediaDevices.getUserMedia(preferencias[tentativa])
+      .then(s=>{
+        window._camStream=s;
+        video.srcObject=s;
+        video.addEventListener('loadedmetadata',function(){
+          try{ video.play(); }catch(e){}
+          btn.disabled=false;
+          status.textContent='Câmera pronta. Toque em Capturar.';
+        },{once:true});
+        setTimeout(()=>{
+          if(video.readyState>=1){ btn.disabled=false; status.textContent='Câmera pronta. Toque em Capturar.'; }
+        },900);
+      })
+      .catch(()=>{
+        if(tentativa<preferencias.length-1){ tentativa++; iniciar(); }
+        else{ status.textContent='Não foi possível acessar a câmera.'; toast('Não foi possível acessar a câmera','error'); }
+      });
+  }
+  iniciar();
 }
-function pararCam(){if(window._camStream){window._camStream.getTracks().forEach(t=>t.stop());window._camStream=null;}fecharModal()}
+function pararCam(){
+  if(window._camStream){ try{ window._camStream.getTracks().forEach(t=>t.stop()); }catch(e){} window._camStream=null; }
+  fecharModal();
+}
 function capturarFoto(prevId,inputId){
-  const v=document.getElementById('camVideo');const canvas=document.createElement('canvas');canvas.width=v.videoWidth;canvas.height=v.videoHeight;canvas.getContext('2d').drawImage(v,0,0);
-  const data=canvas.toDataURL('image/jpeg');document.getElementById(prevId).innerHTML=`<img src="${data}">`;document.getElementById(inputId).value=data;
-  pararCam();toast('Foto capturada','success');
+  const v=document.getElementById('camVideo');
+  if(!v||!v.videoWidth||v.videoWidth===0){
+    toast('Aguardando a câmera. Tente novamente em instantes.','error');
+    return;
+  }
+  const canvas=document.createElement('canvas');
+  canvas.width=v.videoWidth;
+  canvas.height=v.videoHeight;
+  canvas.getContext('2d').drawImage(v,0,0);
+  const data=canvas.toDataURL('image/jpeg',0.9);
+  document.getElementById(prevId).innerHTML=`<img src="${data}" alt="foto">`;
+  document.getElementById(inputId).value=data;
+  pararCam();
+  toast('Foto capturada','success');
 }
 function lerArquivoFoto(input,prevId,inputId){
   const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{document.getElementById(prevId).innerHTML=`<img src="${e.target.result}">`;document.getElementById(inputId).value=e.target.result};r.readAsDataURL(f);
@@ -1093,7 +1157,10 @@ function lerArquivoFoto(input,prevId,inputId){
 
 /* ============ MODAL / CONFIRM ============ */
 function abrirModal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modalOverlay').classList.add('open')}
-function fecharModal(){document.getElementById('modalOverlay').classList.remove('open')}
+function fecharModal(){
+  if(window._camStream){ try{ window._camStream.getTracks().forEach(t=>t.stop()); }catch(e){} window._camStream=null; }
+  document.getElementById('modalOverlay').classList.remove('open');
+}
 function fecharConfirm(){document.getElementById('confirmOverlay').classList.remove('open')}
 document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target.id==='modalOverlay')fecharModal()});
 document.getElementById('confirmOverlay').addEventListener('click',e=>{if(e.target.id==='confirmOverlay')fecharConfirm()});
