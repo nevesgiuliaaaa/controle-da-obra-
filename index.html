@@ -177,12 +177,11 @@ video{width:100%;border-radius:8px;margin-bottom:10px}
     <div id="loginFallback" style="display:none;font-family:Georgia,serif;font-size:26px;color:var(--bordo);margin-bottom:20px">LINDENBERG<small style="display:block;font-family:Inter;font-size:10px;letter-spacing:4px;color:#666">DESDE 1954</small></div>
     <h1>Controle de Acesso</h1>
     <p>Acesse o sistema de portaria</p>
-    <div class="field"><label>E-mail</label><input type="email" id="loginEmail" value="portaria"></div>
-    <div class="field"><label>Senha</label><input type="password" id="loginSenha" value="Limoema26"></div>
-<button class="btn btn-primary" style="width:100%;justify-content:center" id="btnEntrar">Entrar</button>
+    <div class="field"><label>Usuário</label><input type="text" id="loginEmail" value="Portaria"></div>
+    <div class="field"><label>Senha</label><input type="password" id="loginSenha" placeholder="Digite a senha"></div>
+    <button class="btn btn-primary" id="btnEntrar" style="width:100%;justify-content:center">Entrar</button>
     <div class="dica">🔑 Usuário: Portaria</div>
   </div>
-</div>
 </div>
 
 <!-- APP -->
@@ -223,9 +222,6 @@ video{width:100%;border-radius:8px;margin-bottom:10px}
 <div class="toast" id="toast"></div>
 
 <script>
-/* ============ BANCO DE DADOS (localStorage) ============ */
-const DB_KEY='lindenberg_v1', SES_KEY='lindenberg_sessao';
-let DB=null, sessao=null, estado={pagina:'inicio', filtroVeic:'todos', filtroVisit:'todos', pagVeic:1, pagVisit:1, pagToalha:1, mesAtual:'2026-09', abaHistorico:'veiculos', abaPerfil:'historico'};
 /* ============ ARMAZENAMENTO SEGURO (localStorage + fallback em memória) ============ */
 let _memStore = {};
 function storageGet(key){
@@ -234,16 +230,22 @@ function storageGet(key){
 }
 function storageSet(key, val){
   try{ localStorage.setItem(key, val); return true; }
-  catch(e){ _memStore[key] = val; return false; } // localStorage cheio/indisponível -> usa memória
+  catch(e){ _memStore[key] = val; return false; }
 }
 function storageRemove(key){
   try{ localStorage.removeItem(key); }catch(e){}
   delete _memStore[key];
 }
+
+/* ============ BANCO DE DADOS ============ */
+const DB_KEY='lindenberg_v1', SES_KEY='lindenberg_sessao';
+let DB=null, sessao=null, estado={pagina:'inicio', filtroVeic:'todos', filtroVisit:'todos', pagVeic:1, pagVisit:1, pagToalha:1, mesAtual:'2026-09', abaHistorico:'veiculos', abaPerfil:'historico'};
+
 function carregarDB(){
-  const raw = storageGet(DB_KEY);
-  if(raw){ try{ DB = JSON.parse(raw); return; }catch(e){} }
-  DB = {usuarios:[],veiculos:[],visitantes:[],movimentacoes:[],toalhas:[],config:{estoqueInicial:{},observacoes:{},empresa:{nome:'LINDENBERG Engenharia',endereco:''}}};
+  const raw=storageGet(DB_KEY);
+  if(raw){ try{ DB=JSON.parse(raw); return; }catch(e){} }
+  if(_memStore[DB_KEY]){ try{ DB=JSON.parse(_memStore[DB_KEY]); return; }catch(e){} }
+  DB={usuarios:[],veiculos:[],visitantes:[],movimentacoes:[],toalhas:[],config:{estoqueInicial:{},observacoes:{},empresa:{nome:'LINDENBERG Engenharia',endereco:''}}};
   semear();
   salvarDB();
 }
@@ -258,9 +260,8 @@ function nomeMes(key){const p=key.split('-');const meses=['Janeiro','Fevereiro',
 
 /* ============ SEMEADOR ============ */
 function semear(){
-  DB.usuarios.push({id:uid(),nome:'Giulia Neves',email:'giulia@lindenberg.com',senha:'123456',funcao:'Administradora',foto:'',ativo:true});
-  DB.usuarios.push({id:uid(),nome:'Alberto Santos',email:'alberto@lindenberg.com',senha:'123456',funcao:'Administradora',foto:'',ativo:true});
-  const g='Giulia Neves';
+  DB.usuarios.push({id:uid(),nome:'Portaria',email:'portaria@lindenberg.com',senha:'Limoema26',funcao:'Portaria',foto:'',ativo:true});
+  const g='Portaria';
   // Veículos
   const v1={id:uid(),placa:'ABC1D23',motorista:'Carlos Henrique Souza',empresa:'Construtora XYZ',foto:'',observacao:'Entrega de materiais',dataCadastro:'2026-08-20',usuario:g};
   const v2={id:uid(),placa:'FGH5I67',motorista:'Marcos Oliveira',empresa:'Transportadora Silva',foto:'',observacao:'Visita técnica',dataCadastro:'2026-08-22',usuario:g};
@@ -287,70 +288,51 @@ function semear(){
   DB.visitantes.push(vi1,vi2,vi3,vi4,vi5,vi6,vi7,vi8,vi9,vi10);
   // Movimentações
   function mov(tipo,ref,data,horario,movimento,obs){DB.movimentacoes.push({id:uid(),tipo,refId:ref.id,data,horario,movimento,observacao:obs,usuario:g,usuarioSaida:g,dataSaida:movimento==='saida'?data:null,horarioSaida:movimento==='saida'?horario:null})}
-  // Histórico ABC1D23 (5 visitas)
   mov('veiculo',v1,'2026-09-01','08:14','entrada','Entrega de materiais'); mov('veiculo',v1,'2026-09-01','16:40','saida',null);
   mov('veiculo',v1,'2026-08-28','08:03','entrada','Manutenção'); mov('veiculo',v1,'2026-08-28','17:20','saida',null);
   mov('veiculo',v1,'2026-08-25','07:58','entrada','Entrega de materiais'); mov('veiculo',v1,'2026-08-25','16:45','saida',null);
-  // Entrada ABERTA hoje ABC1D23
   DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:v1.id,data:'2026-09-08',horario:'08:14',movimento:'entrada',observacao:'Entrega de materiais',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  // FGH5I67 saída hoje
   mov('veiculo',v2,'2026-09-08','09:47','saida',null); mov('veiculo',v2,'2026-09-08','07:30','entrada','Visita técnica');
-  // QWE8J90 entrada hoje
   DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:v3.id,data:'2026-09-08',horario:'09:12',movimento:'entrada',observacao:'Reunião',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  // Outros veículos hoje
   DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:v4.id,data:'2026-09-08',horario:'09:20',movimento:'entrada',observacao:'Entrega de documentos',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
   DB.movimentacoes.push({id:uid(),tipo:'veiculo',refId:v5.id,data:'2026-09-08',horario:'08:40',movimento:'entrada',observacao:'Manutenção',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  // Visitantes: Mariana entrada aberta hoje 08:30
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi1.id,data:'2026-09-08',horario:'08:30',movimento:'entrada',observacao:'Reunião',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi1.id,data:'2026-09-05',horario:'14:22',movimento:'entrada',observacao:'Reunião',usuario:g,dataSaida:'2026-09-05',horarioSaida:'16:00',usuarioSaida:g});
-  // João Pedro entrada hoje 09:30
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi2.id,data:'2026-09-08',horario:'09:30',movimento:'entrada',observacao:'Entrega de materiais',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  // Ana Beatriz saída hoje 08:12
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi3.id,data:'2026-09-08',horario:'08:12',movimento:'saida',observacao:null,usuario:g,dataSaida:'2026-09-08',horarioSaida:'08:12',usuarioSaida:g});
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi3.id,data:'2026-09-08',horario:'07:00',movimento:'entrada',observacao:'Visita técnica',usuario:g,dataSaida:'2026-09-08',horarioSaida:'08:12',usuarioSaida:g});
-  // Mais visitantes hoje
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi4.id,data:'2026-09-08',horario:'10:11',movimento:'entrada',observacao:'Reunião',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
   DB.movimentacoes.push({id:uid(),tipo:'visitante',refId:vi5.id,data:'2026-09-08',horario:'08:05',movimento:'entrada',observacao:'Entrega de documentos',usuario:g,dataSaida:null,horarioSaida:null,usuarioSaida:null});
-  // Toalhas Setembro 2026 (28 registros)
-  const set=['2026-09-08','2026-09-07','2026-09-06','2026-09-05','2026-09-04','2026-09-03','2026-09-02','2026-09-01'];
+  // Toalhas Setembro 2026
   const nomesT=[['João Pedro Silva','Fornecedor ABC'],['Mariana Costa Lima','Cliente'],['Carlos Henrique Souza','Construtora XYZ'],['Ana Beatriz Souza','Arquiteta'],['Rafael Lima','Construtora XYZ'],['Fernando Oliveira','Cliente'],['Pedro Almeida','Transportadora Silva'],['Carla Nunes','Fornecedor'],['Beatriz Ramos','Arquiteta'],['Thiago Alves','Cliente'],['Juliana Prado','Construtora ABC'],['Paulo Mendes','Fornecedor Beta'],['Bruno Castro','Construtora ABC'],['Diego Rocha','Construtora XYZ']];
-  let seq=0;
   function addToalha(mes,data,horario,nome,empresa,entregue,devolvido,qtd){DB.toalhas.push({id:uid(),mes,data,horario,nome,empresa,responsavel:g,quantidade:qtd||1,entregue,devolvido,observacao:'',usuario:g})}
-  // 08/09
   addToalha('2026-09','2026-09-08','16:30','João Pedro Silva','Fornecedor ABC',false,true);
   addToalha('2026-09','2026-09-08','14:22','Mariana Costa Lima','Cliente',true,false);
   addToalha('2026-09','2026-09-08','10:15','Carlos Henrique Souza','Construtora XYZ',true,false);
   addToalha('2026-09','2026-09-08','09:47','Ana Beatriz Souza','Arquiteta',false,true);
   addToalha('2026-09','2026-09-08','08:30','Rafael Lima','Construtora XYZ',true,false);
-  // 07/09
   addToalha('2026-09','2026-09-07','17:12','Fernando Oliveira','Cliente',true,false);
   addToalha('2026-09','2026-09-07','15:48','Pedro Almeida','Transportadora Silva',false,true);
   addToalha('2026-09','2026-09-07','11:20','Carla Nunes','Fornecedor',true,false);
   addToalha('2026-09','2026-09-07','09:05','Beatriz Ramos','Arquiteta',false,true);
-  // 06/09
   addToalha('2026-09','2026-09-06','16:10','Thiago Alves','Cliente',true,false);
   addToalha('2026-09','2026-09-06','13:40','Juliana Prado','Construtora ABC',true,false);
   addToalha('2026-09','2026-09-06','10:22','Paulo Mendes','Fornecedor Beta',false,true);
   addToalha('2026-09','2026-09-06','08:15','Bruno Castro','Construtora ABC',true,false);
-  // 05/09
   addToalha('2026-09','2026-09-05','17:30','Diego Rocha','Construtora XYZ',true,false);
   addToalha('2026-09','2026-09-05','14:05','João Pedro Silva','Fornecedor ABC',true,false);
   addToalha('2026-09','2026-09-05','11:45','Mariana Costa Lima','Cliente',false,true);
   addToalha('2026-09','2026-09-05','09:18','Carlos Henrique Souza','Construtora XYZ',true,false);
-  // 04/09
   addToalha('2026-09','2026-09-04','16:55','Ana Beatriz Souza','Arquiteta',true,false);
   addToalha('2026-09','2026-09-04','13:12','Rafael Lima','Construtora XYZ',false,true);
   addToalha('2026-09','2026-09-04','10:48','Fernando Oliveira','Cliente',true,false);
   addToalha('2026-09','2026-09-04','08:33','Pedro Almeida','Transportadora Silva',true,false);
-  // 03/09
   addToalha('2026-09','2026-09-03','17:02','Carla Nunes','Fornecedor',true,false);
   addToalha('2026-09','2026-09-03','14:27','Beatriz Ramos','Arquiteta',true,false);
   addToalha('2026-09','2026-09-03','09:50','Thiago Alves','Cliente',false,true);
-  // 02/09
   addToalha('2026-09','2026-09-02','16:44','Juliana Prado','Construtora ABC',true,false);
   addToalha('2026-09','2026-09-02','12:19','Paulo Mendes','Fornecedor Beta',true,false);
   addToalha('2026-09','2026-09-02','08:58','Bruno Castro','Construtora ABC',false,true);
-  // 01/09
   addToalha('2026-09','2026-09-01','17:21','Diego Rocha','Construtora XYZ',true,false);
   addToalha('2026-09','2026-09-01','15:36','João Pedro Silva','Fornecedor ABC',true,false);
   // Agosto 2026 (15)
@@ -385,11 +367,10 @@ const paginas={
   toalhas:{titulo:'Controle de Toalhas',sub:'Gerencie a entrega e devolução de toalhas por mês.',render:renderToalhas,novo:true,toalha:true},
   historico:{titulo:'Consultar Histórico',sub:'Pesquise o histórico de veículos e visitantes.',render:renderHistorico,novo:false},
   relatorios:{titulo:'Relatórios',sub:'Gere relatórios e exporte para Excel.',render:renderRelatorios,novo:false},
-  usuarios:{titulo:'Usuários',sub:'Gerencie os usuários do sistema.',render:renderUsuarios,novo:false},
   configuracoes:{titulo:'Configurações',sub:'Ajustes do sistema e do seu perfil.',render:renderConfig,novo:false},
   perfil:{titulo:'Perfil',sub:'',render:renderPerfil,novo:false}
 };
-const menuItens=[['inicio','🏠','Início'],['veiculos','🚗','Veículos'],['visitantes','👤','Visitantes'],['toalhas','🧺','Controle de Toalhas'],['historico','🕐','Histórico'],['relatorios','📊','Relatórios'],['usuarios','👥','Usuários'],['configuracoes','⚙️','Configurações']];
+const menuItens=[['inicio','🏠','Início'],['veiculos','🚗','Veículos'],['visitantes','👤','Visitantes'],['toalhas','🧺','Controle de Toalhas'],['historico','🕐','Histórico'],['relatorios','📊','Relatórios'],['configuracoes','⚙️','Configurações']];
 
 function renderMenu(){
   document.getElementById('menuNav').innerHTML=menuItens.map(([id,ic,label])=>`<a href="#" class="${estado.pagina===id?'active':''}" onclick="navegar('${id}')">${ic} ${label}</a>`).join('');
@@ -403,8 +384,7 @@ function renderPagina(){
   const p=paginas[estado.pagina];
   document.getElementById('pageTitle').innerHTML=`<h2>${p.titulo}</h2><div class="sub">${p.sub}</div>`;
   document.getElementById('btnNovoRegistro').style.display=p.novo?'inline-flex':'none';
-  if(p.toalha){document.getElementById('btnNovoRegistro').innerHTML='+ Novo Registro';}
-  else{document.getElementById('btnNovoRegistro').innerHTML='+ Novo Registro';}
+  document.getElementById('btnNovoRegistro').innerHTML='+ Novo Registro';
   p.render();
 }
 
@@ -480,7 +460,6 @@ function renderVeiculos(){
     </table></div>
     ${paginationHtml(estado.pagVeic,paginasN,total,'pagVeic')}
   </div>`;
-  // busca automática por placa
   const placaExata=DB.veiculos.find(v=>v.placa===q.toUpperCase());
   if(placaExata&&q.length>=7){document.getElementById('buscaAutoVeic').innerHTML=painelEncontrado('veiculo',placaExata);}
 }
@@ -488,13 +467,12 @@ function painelEncontrado(tipo,ref){
   const ms=movsDe(ref.id,tipo);const dentro=estaDentro(ref.id,tipo);const um=ms[0];
   const nome=tipo==='veiculo'?ref.placa:ref.nome;
   const sub=tipo==='veiculo'?`Motorista: ${ref.motorista}`:`Documento: ${ref.documento}`;
-  const emp=tipo==='veiculo'?ref.empresa:ref.empresa;
   return `<div class="panel" style="border:2px solid var(--bordo)">
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
       ${avatarHtml(ref,56)}
       <div style="flex:1;min-width:200px">
         <h3 style="margin:0">${tipo==='veiculo'?'🚗':''} ${esc(nome)}</h3>
-        <p style="color:var(--texto2);font-size:13px">${esc(sub)}<br>Empresa: ${esc(emp)}</p>
+        <p style="color:var(--texto2);font-size:13px">${esc(sub)}<br>Empresa: ${esc(ref.empresa)}</p>
         <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--texto2)">Total de visitas: <b>${ms.length}</b></span>
           <span style="font-size:13px;color:var(--texto2)">Última movimentação: <b>${um?fmtDataHora(um.data,um.horario):'—'}</b></span>
@@ -796,26 +774,6 @@ function exportarExcel(){
   toast('Relatório exportado','success');
 }
 
-/* ============ USUÁRIOS ============ */
-function renderUsuarios(){
-  const c=document.getElementById('content');
-  c.innerHTML=`
-  <div class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-      <h3 style="margin:0">Usuários do sistema</h3>
-      <button class="btn btn-primary btn-sm" onclick="abrirNovoUsuario()">+ Novo Usuário</button>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Status</th><th>Ações</th></tr></thead>
-      <tbody>${DB.usuarios.map(u=>`<tr>
-        <td style="display:flex;align-items:center;gap:10px">${avatarHtml(u)} <b>${esc(u.nome)}</b></td>
-        <td>${esc(u.email)}</td><td>${esc(u.funcao)}</td>
-        <td>${u.ativo?`<span class="pill pill-green">Ativo</span>`:`<span class="pill pill-red">Inativo</span>`}</td>
-        <td>${menuAcoes('usuario',u.id)}</td></tr>`).join('')}</tbody>
-    </table></div>
-  </div>`;
-}
-
 /* ============ CONFIGURAÇÕES ============ */
 function renderConfig(){
   const u=getUsuario();
@@ -845,7 +803,7 @@ function menuAcoes(tipo,id){
   return `<div class="dropdown">
     <button class="actions-btn" onclick="event.stopPropagation();toggleMenu(this)">⋯</button>
     <div class="dropdown-menu">
-      ${tipo!=='usuario'?`<button onclick="event.stopPropagation();abrirPerfil('${tipo}','${id}')">👁 Visualizar</button>`:''}
+      <button onclick="event.stopPropagation();abrirPerfil('${tipo}','${id}')">👁 Visualizar</button>
       <button onclick="event.stopPropagation();editarRegistro('${tipo}','${id}')">✏️ Editar</button>
       <button onclick="event.stopPropagation();confirmarExcluir('${tipo}','${id}')">🗑 Excluir</button>
     </div>
@@ -859,7 +817,6 @@ function confirmarExcluir(tipo,id){
   if(tipo==='veiculo')nome=DB.veiculos.find(v=>v.id===id).placa;
   else if(tipo==='visitante')nome=DB.visitantes.find(v=>v.id===id).nome;
   else if(tipo==='toalha'){const t=DB.toalhas.find(t=>t.id===id);nome=t.nome+' ('+fmtData(t.data)+')';}
-  else if(tipo==='usuario')nome=DB.usuarios.find(u=>u.id===id).nome;
   document.getElementById('confirmBox').innerHTML=`
     <h3>Excluir registro</h3>
     <p style="color:var(--texto2);margin-bottom:20px">Tem certeza que deseja excluir <b>${esc(nome)}</b>? Esta ação não pode ser desfeita.</p>
@@ -870,7 +827,6 @@ function excluirRegistro(tipo,id){
   if(tipo==='veiculo'){DB.veiculos=DB.veiculos.filter(v=>v.id!==id);DB.movimentacoes=DB.movimentacoes.filter(m=>!(m.refId===id&&m.tipo==='veiculo'));}
   else if(tipo==='visitante'){DB.visitantes=DB.visitantes.filter(v=>v.id!==id);DB.movimentacoes=DB.movimentacoes.filter(m=>!(m.refId===id&&m.tipo==='visitante'));}
   else if(tipo==='toalha')DB.toalhas=DB.toalhas.filter(t=>t.id!==id);
-  else if(tipo==='usuario')DB.usuarios=DB.usuarios.filter(u=>u.id!==id);
   salvarDB();fecharConfirm();renderPagina();toast('Registro excluído','success');
 }
 function editarRegistro(tipo,id){
@@ -890,16 +846,10 @@ function editarRegistro(tipo,id){
     <div class="field"><label>Quantidade</label><input type="number" id="tQtd" value="${t.quantidade}" min="1"></div>
     <div class="field"><label>Situação</label><select id="tSit"><option value="entregue" ${t.entregue?'selected':''}>Entregue</option><option value="devolvido" ${t.devolvido?'selected':''}>Devolvido</option></select></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEdicaoToalha('${id}')">Salvar</button></div>`);}
-  else if(tipo==='usuario'){const u=DB.usuarios.find(u=>u.id===id);abrirModal(`<h3>Editar Usuário</h3>
-    <div class="field"><label>Nome</label><input id="uNome" value="${esc(u.nome)}"></div>
-    <div class="field"><label>E-mail</label><input id="uEmail" value="${esc(u.email)}"></div>
-    <div class="field"><label>Função</label><select id="uFuncao"><option ${u.funcao==='Administradora'?'selected':''}>Administradora</option><option ${u.funcao==='Operadora'?'selected':''}>Operadora</option></select></div>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarEdicaoUsuario('${id}')">Salvar</button></div>`);}
 }
 function salvarEdicaoVeiculo(id){const v=DB.veiculos.find(v=>v.id===id);v.motorista=document.getElementById('eMotorista').value;v.empresa=document.getElementById('eEmpresa').value;v.observacao=document.getElementById('eObs').value;salvarDB();fecharModal();renderPagina();toast('Veículo atualizado','success')}
 function salvarEdicaoVisitante(id){const v=DB.visitantes.find(v=>v.id===id);v.nome=document.getElementById('eNome').value;v.empresa=document.getElementById('eEmpresa').value;v.observacao=document.getElementById('eObs').value;salvarDB();fecharModal();renderPagina();toast('Visitante atualizado','success')}
 function salvarEdicaoToalha(id){const t=DB.toalhas.find(t=>t.id===id);t.nome=document.getElementById('tNome').value;t.empresa=document.getElementById('tEmpresa').value;t.quantidade=parseInt(document.getElementById('tQtd').value)||1;const sit=document.getElementById('tSit').value;t.entregue=sit==='entregue';t.devolvido=sit==='devolvido';salvarDB();fecharModal();renderToalhas();toast('Registro atualizado','success')}
-function salvarEdicaoUsuario(id){const u=DB.usuarios.find(u=>u.id===id);u.nome=document.getElementById('uNome').value;u.email=document.getElementById('uEmail').value;u.funcao=document.getElementById('uFuncao').value;salvarDB();fecharModal();renderUsuarios();toast('Usuário atualizado','success')}
 
 /* ============ NOVO REGISTRO ============ */
 function abrirNovoRegistro(){
@@ -1026,22 +976,6 @@ function salvarToalha(entregue){
   toast((entregue?'✓ Entregue':'✕ Devolvido')+' registrado às '+agora(),'success');
 }
 
-/* ============ USUÁRIOS: NOVO ============ */
-function abrirNovoUsuario(){
-  abrirModal(`<h3>Novo Usuário</h3>
-    <div class="field"><label>Nome</label><input id="nuNome"></div>
-    <div class="field"><label>E-mail</label><input id="nuEmail" type="email"></div>
-    <div class="field"><label>Senha</label><input id="nuSenha" type="password"></div>
-    <div class="field"><label>Função</label><select id="nuFuncao"><option>Administradora</option><option>Operadora</option></select></div>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button><button class="btn btn-primary" onclick="criarUsuario()">Criar</button></div>`);
-}
-function criarUsuario(){
-  const nome=document.getElementById('nuNome').value.trim();const email=document.getElementById('nuEmail').value.trim();const senha=document.getElementById('nuSenha').value;
-  if(!nome||!email||!senha){toast('Preencha todos os campos','error');return;}
-  DB.usuarios.push({id:uid(),nome,email,senha,funcao:document.getElementById('nuFuncao').value,foto:'',ativo:true});
-  salvarDB();fecharModal();renderUsuarios();toast('Usuário criado','success');
-}
-
 /* ============ FOTO (câmera / arquivo) ============ */
 function tirarFoto(prevId,inputId){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Câmera não suportada neste dispositivo','error');return;}
@@ -1078,26 +1012,37 @@ function mudarPag(p,key){estado[key]=p;renderPagina()}
 
 /* ============ LOGIN / SESSÃO ============ */
 function fazerLogin(){
-  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
+  const usuario=document.getElementById('loginEmail').value.trim();
   const senha=document.getElementById('loginSenha').value;
-  const u=DB.usuarios.find(x=>x.email.toLowerCase()===email&&x.senha===senha);
-  if(!u){toast('E-mail ou senha incorretos','error');return;}
-  sessao=u.id;storageSet(SES_KEY,u.id);
-  document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';
+  if(usuario!=='Portaria'||senha!=='Limoema26'){
+    toast('Usuário ou senha incorretos','error');
+    return;
+  }
+  let u=DB.usuarios.find(x=>x.nome==='Portaria');
+  if(!u){
+    u={id:uid(),nome:'Portaria',email:'portaria@lindenberg.com',senha:'Limoema26',funcao:'Portaria',foto:'',ativo:true};
+    DB.usuarios.push(u);
+    salvarDB();
+  }
+  sessao=u.id;
+  storageSet(SES_KEY,u.id);
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
   navegar('inicio');
+  atualizarRelogio();
 }
-function sair(){sessao=null;storageRemove(SES_KEY);;document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex'}
+function sair(){sessao=null;storageRemove(SES_KEY);document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex'}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open')}
 function logoLoginFalhou(img){
   if(!img.dataset.tentouJpg){
-    img.dataset.tentouJpg = '1';
-    img.src = 'logocontrole.jpg';
-  } else {
-    img.style.display = 'none';
-    var fb = document.getElementById('loginFallback');
-    if(fb) fb.style.display = 'block';
+    img.dataset.tentouJpg='1';
+    img.src='logocontrole.jpg';
+  }else{
+    img.style.display='none';
+    var fb=document.getElementById('loginFallback');
+    if(fb)fb.style.display='block';
   }
 }
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open')}
 
 /* ============ RELÓGIO / TEMPO ============ */
 function atualizarRelogio(){
@@ -1105,10 +1050,8 @@ function atualizarRelogio(){
   const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   const h=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
   document.getElementById('clock').innerHTML=`<b>${h}</b>${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
-  // atualizar tempos decorridos
   document.querySelectorAll('.tempo').forEach(el=>{el.textContent=tempoDecorrido(el.dataset.d,el.dataset.h)});
 }
-setInterval(atualizarRelogio,1000);
 
 /* ============ INIT ============ */
 try{
@@ -1124,13 +1067,11 @@ try{
   }
   atualizarRelogio();
   setInterval(atualizarRelogio,1000);
-
-  // Liga o botão Entrar e a tecla Enter
   document.getElementById('btnEntrar').addEventListener('click',fazerLogin);
   document.getElementById('loginSenha').addEventListener('keydown',function(e){if(e.key==='Enter')fazerLogin();});
 }catch(err){
   console.error('Erro ao iniciar o sistema:',err);
-  alert('Erro ao iniciar o sistema: '+err.message);
+  document.getElementById('login').style.display='flex';
 }
 </script>
 </body>
