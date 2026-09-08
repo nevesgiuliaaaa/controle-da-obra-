@@ -245,17 +245,19 @@ function storageGet(key){
   try{ return localStorage.getItem(key); }
   catch(e){ return _memStore[key] !== undefined ? _memStore[key] : null; }
 }
-function storageSet(key, val){
-  try{ localStorage.setItem(key, val); return true; }
-  catch(e){ _memStore[key] = val; return false; }
-}
-function storageRemove(key){
+var _avisoQuota=false;
+function storageSet(key,val){
+  var ok=true;
+  try{ localStorage.setItem(key,val); }catch(e){ ok=false; _memStore[key]=val; }
+  if(!ok&&!_avisoQuota){ _avisoQuota=true; toast('⚠️ Armazenamento cheio — dados não serão salvos ao fechar. As fotos agora são reduzidas automaticamente.','error'); }
+  return ok;
+}function storageRemove(key){
   try{ localStorage.removeItem(key); }catch(e){}
   delete _memStore[key];
 }
 
 /* ============ BANCO DE DADOS ============ */
-const DB_KEY='lindenberg_v1', SES_KEY='lindenberg_sessao';
+const DB_KEY='lindenberg_v2', SES_KEY='lindenberg_sessao';
 let DB=null, sessao=null, estado={pagina:'inicio', filtroVeic:'todos', filtroVisit:'todos', pagVeic:1, pagVisit:1, pagToalha:1, mesAtual:'2026-09', abaToalha:'diario', diaToalha:null, abaHistorico:'veiculos', abaPerfil:'historico'};
 
 function carregarDB(){
@@ -1100,6 +1102,25 @@ function salvarToalha(entregue){
   toast((entregue?'✓ Entregue':'✕ Devolvido')+' registrado às '+agoraS,'success');
 }
 
+/* ============ COMPRESSÃO DE FOTO (evita estourar o localStorage) ============ */
+function comprimirFoto(dataUrl,maxTam,qualidade){
+  maxTam=maxTam||400; qualidade=qualidade||0.6;
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var escala=Math.min(1,maxTam/Math.max(img.width,img.height));
+        var c=document.createElement('canvas');
+        c.width=Math.round(img.width*escala);
+        c.height=Math.round(img.height*escala);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL('image/jpeg',qualidade));
+      }catch(e){ resolve(dataUrl); }
+    };
+    img.onerror=function(){ resolve(dataUrl); };
+    img.src=dataUrl;
+  });
+}
 /* ============ FOTO (câmera traseira / arquivo) ============ */
 function tirarFoto(prevId,inputId){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
@@ -1143,25 +1164,28 @@ function pararCam(){
   fecharModal();
 }
 function capturarFoto(prevId,inputId){
-  const v=document.getElementById('camVideo');
-  if(!v||!v.videoWidth||v.videoWidth===0){
-    toast('Aguardando a câmera. Tente novamente em instantes.','error');
-    return;
-  }
-  const canvas=document.createElement('canvas');
-  canvas.width=v.videoWidth;
-  canvas.height=v.videoHeight;
+  var v=document.getElementById('camVideo');
+  if(!v||!v.videoWidth||v.videoWidth===0){ toast('Aguardando a câmera. Tente novamente em instantes.','error'); return; }
+  var canvas=document.createElement('canvas'); canvas.width=v.videoWidth; canvas.height=v.videoHeight;
   canvas.getContext('2d').drawImage(v,0,0);
-  const data=canvas.toDataURL('image/jpeg',0.9);
-  document.getElementById(prevId).innerHTML=`<img src="${data}" alt="foto">`;
-  document.getElementById(inputId).value=data;
-  pararCam();
-  toast('Foto capturada','success');
+  var data=canvas.toDataURL('image/jpeg',0.9);
+  comprimirFoto(data).then(function(comprimida){
+    document.getElementById(prevId).innerHTML='<img src="'+comprimida+'" alt="foto">';
+    document.getElementById(inputId).value=comprimida;
+    pararCam(); toast('Foto capturada','success');
+  });
 }
 function lerArquivoFoto(input,prevId,inputId){
-  const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{document.getElementById(prevId).innerHTML=`<img src="${e.target.result}">`;document.getElementById(inputId).value=e.target.result};r.readAsDataURL(f);
+  var f=input.files[0]; if(!f)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    comprimirFoto(e.target.result).then(function(comprimida){
+      document.getElementById(prevId).innerHTML='<img src="'+comprimida+'" alt="foto">';
+      document.getElementById(inputId).value=comprimida;
+    });
+  };
+  r.readAsDataURL(f);
 }
-
 /* ============ MODAL / CONFIRM ============ */
 function abrirModal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modalOverlay').classList.add('open')}
 function fecharModal(){
